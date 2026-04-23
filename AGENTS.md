@@ -2,7 +2,9 @@
 
 ## Overview
 
-This repository is a template with sensible defaults for building Tauri React apps.
+**CyberFlow** — A completely open, scriptable AI assistant for your desktop. CyberFlow turns daily routines into automated, intelligent workflows through powerful LLM integrations and deep OS hooks.
+
+Built on Tauri v2 + React with opinionated architectural patterns.
 
 ## Core Rules
 

@@ -11,7 +11,7 @@
 
 Do not report security vulnerabilities through public GitHub issues.
 
-**Contact**: YOUR_SECURITY_EMAIL
+**Contact**: Open a private security advisory at https://github.com/zhanghuawei/CyberFlow/security/advisories/new
 
 Include:
 

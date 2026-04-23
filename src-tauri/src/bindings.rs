@@ -1,7 +1,7 @@
 use tauri_specta::{collect_commands, Builder};
 
 pub fn generate_bindings() -> Builder<tauri::Wry> {
-    use crate::commands::{notifications, preferences, quick_pane, recovery};
+    use crate::commands::{mstsc, notifications, preferences, quick_pane, recovery, sangfor};
 
     Builder::<tauri::Wry>::new().commands(collect_commands![
         preferences::greet,
@@ -16,6 +16,12 @@ pub fn generate_bindings() -> Builder<tauri::Wry> {
         quick_pane::toggle_quick_pane,
         quick_pane::get_default_quick_pane_shortcut,
         quick_pane::update_quick_pane_shortcut,
+        sangfor::launch_sangfor_client,
+        sangfor::inject_sangfor_credentials,
+        sangfor::click_sangfor_login,
+        mstsc::launch_mstsc,
+        mstsc::inject_mstsc_ip,
+        mstsc::click_mstsc_connect,
     ])
 }
 

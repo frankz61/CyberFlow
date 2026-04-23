@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils'
-import { useUIStore } from '@/store/ui-store'
+import { SangforPanel } from '@/components/sangfor/SangforPanel'
+import { MstscPanel } from '@/components/mstsc/MstscPanel'
 
 interface MainWindowContentProps {
   children?: React.ReactNode
@@ -10,17 +11,22 @@ export function MainWindowContent({
   children,
   className,
 }: MainWindowContentProps) {
-  const lastQuickPaneEntry = useUIStore(state => state.lastQuickPaneEntry)
-
   return (
     <div className={cn('flex h-full flex-col bg-background', className)}>
       {children || (
-        <div className="flex flex-1 flex-col items-center justify-center">
-          <h1 className="text-4xl font-bold text-foreground">
-            {lastQuickPaneEntry
-              ? `Last entry: ${lastQuickPaneEntry}`
-              : 'Hello World'}
-          </h1>
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+            <header>
+              <h1 className="text-2xl font-bold text-foreground">
+                自动化工作台
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                按栏目分组的桌面自动化快捷入口
+              </p>
+            </header>
+            <SangforPanel />
+            <MstscPanel />
+          </div>
         </div>
       )}
     </div>

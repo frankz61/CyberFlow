@@ -1,6 +1,8 @@
-# Tauri React Template
+# CyberFlow
 
-A "batteries-included" template for building production-ready desktop applications with **Tauri v2**, **React**, and **TypeScript**. Designed with opinionated patterns that help both human developers and AI coding agents build well-architected apps from the start.
+A completely open, scriptable AI assistant for your desktop. **CyberFlow** turns daily routines into automated, intelligent workflows through powerful LLM integrations and deep OS hooks.
+
+Built on **Tauri v2**, **React**, and **TypeScript** with opinionated architectural patterns for both human developers and AI coding agents.
 
 ## Why This Template?
 

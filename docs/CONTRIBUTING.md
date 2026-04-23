@@ -13,7 +13,7 @@ Thank you for your interest in contributing!
 ### Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/YOUR_REPO.git
+git clone https://github.com/zhanghuawei/CyberFlow.git
 cd YOUR_REPO
 npm install
 npm run dev

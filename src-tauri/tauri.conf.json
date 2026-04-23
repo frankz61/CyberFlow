@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "tauri-app",
+  "productName": "CyberFlow",
   "version": "0.1.0",
-  "identifier": "com.tauri-app.app",
+  "identifier": "com.zhanghuawei.cyberflow",
   "build": {
     "removeUnusedCommands": true,
     "beforeDevCommand": "npm run dev",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "tauri-app",
+        "title": "CyberFlow",
         "width": 1200,
         "height": 800,
         "minWidth": 1000,
@@ -46,11 +46,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "publisher": "Your Name",
-    "category": "DeveloperTool",
-    "shortDescription": "A Tauri React template application",
-    "longDescription": "A modern Tauri React template with comprehensive boilerplate code, TypeScript, Tailwind CSS, and shadcn/ui components.",
-    "copyright": "Copyright © 2025 Your Name. All rights reserved.",
+    "publisher": "zhanghuawei",
+    "category": "Productivity",
+    "shortDescription": "A scriptable AI desktop assistant that automates your daily workflows.",
+    "longDescription": "CyberFlow is a completely open, scriptable AI assistant for your desktop. It turns daily routines into automated, intelligent workflows through powerful LLM integrations and deep OS hooks.",
+    "copyright": "Copyright © 2026 zhanghuawei. All rights reserved.",
     "macOS": {
       "frameworks": [],
       "minimumSystemVersion": "10.15",
@@ -64,7 +64,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download/latest.json"
+        "https://github.com/zhanghuawei/CyberFlow/releases/latest/download/latest.json"
       ],
       "dialog": true,
       "pubkey": "YOUR_UPDATER_PUBLIC_KEY_HERE"

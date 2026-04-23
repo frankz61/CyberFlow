@@ -1,8 +1,8 @@
 [package]
-name = "tauri-app"
+name = "cyberflow"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A completely open, scriptable AI assistant for your desktop. CyberFlow turns daily routines into automated, intelligent workflows through powerful LLM integrations and deep OS hooks."
+authors = ["zhanghuawei"]
 edition = "2021"
 rust-version = "1.82"
 
@@ -12,7 +12,7 @@ rust-version = "1.82"
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "tauri_app_lib"
+name = "cyberflow_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -44,6 +44,17 @@ specta-typescript = "=0.0.9"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
+
+# Windows-only: raw Win32 APIs for launching + UI-automating external apps
+# (used by commands::sangfor to drive the Sangfor VDI client)
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+] }
 
 # macOS-only: NSPanel for native panel behavior (fullscreen overlay, click-outside dismiss)
 [target.'cfg(target_os = "macos")'.dependencies]
