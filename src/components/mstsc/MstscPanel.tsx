@@ -13,8 +13,6 @@ import { commands } from '@/lib/tauri-bindings'
 import { logger } from '@/lib/logger'
 import { sleep, withRetry } from '@/lib/retry'
 
-const DEFAULT_IP = '10.1.201.146'
-
 // mstsc opens its dialog quickly (<1s typically). 15 attempts at 300ms
 // gives us ~4.5s, which covers slow disks or UAC interruptions.
 const WINDOW_WAIT_ATTEMPTS = 15
@@ -23,7 +21,7 @@ const WINDOW_WAIT_DELAY_MS = 300
 type BusyAction = 'launch' | 'inject' | 'click' | 'run-all' | null
 
 export function MstscPanel() {
-  const [ip, setIp] = useState(DEFAULT_IP)
+  const [ip, setIp] = useState('')
   const [busy, setBusy] = useState<BusyAction>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info')
@@ -151,7 +149,7 @@ export function MstscPanel() {
               id="mstsc-ip"
               value={ip}
               onChange={e => setIp(e.target.value)}
-              placeholder="例如 10.1.201.146"
+              placeholder="例如 192.168.1.100"
               disabled={busy !== null}
             />
           </div>

@@ -13,9 +13,6 @@ import { commands } from '@/lib/tauri-bindings'
 import { logger } from '@/lib/logger'
 import { sleep, withRetry } from '@/lib/retry'
 
-const DEFAULT_USERNAME = 'zzvcom_3391'
-const DEFAULT_PASSWORD = 'zzvcom_zhw'
-
 // Retry budget for the window-waiting steps. Sangfor's client can be
 // slow to cold-start (module loading, cert checks): budget ~60s at 500ms
 // polls. When the client is already open, inject succeeds on attempt 1
@@ -26,8 +23,8 @@ const WINDOW_WAIT_DELAY_MS = 500
 type BusyAction = 'launch' | 'inject' | 'click' | 'run-all' | null
 
 export function SangforPanel() {
-  const [username, setUsername] = useState(DEFAULT_USERNAME)
-  const [password, setPassword] = useState(DEFAULT_PASSWORD)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState<BusyAction>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info')
@@ -170,7 +167,7 @@ export function SangforPanel() {
               id="sangfor-username"
               value={username}
               onChange={e => setUsername(e.target.value)}
-              placeholder="例如 zzvcom_3391"
+              placeholder="请输入用户名"
               autoComplete="off"
               disabled={busy !== null}
             />
