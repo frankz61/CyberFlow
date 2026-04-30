@@ -22,7 +22,14 @@ export function usePreferences() {
         logger.warn('Failed to load preferences, using defaults', {
           error: result.error,
         })
-        return { theme: 'system', quick_pane_shortcut: null, language: null }
+        return {
+          theme: 'system',
+          quick_pane_shortcut: null,
+          language: null,
+          sangfor_default_username: null,
+          sangfor_default_password: null,
+          mstsc_default_computer: null,
+        }
       }
 
       logger.info('Preferences loaded successfully', {
@@ -32,6 +39,31 @@ export function usePreferences() {
     },
     staleTime: 1000 * 60 * 5, // 5 minutes
     gcTime: 1000 * 60 * 10, // 10 minutes
+  })
+}
+
+/**
+ * Writes preferences without toast — for syncing automation fields (Sangfor / MSTSC).
+ */
+export function usePersistPreferencesQuiet() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (preferences: AppPreferences) => {
+      logger.debug('Persisting preferences (quiet)', { preferences })
+      const result = await commands.savePreferences(preferences)
+
+      if (result.status === 'error') {
+        logger.error('Failed to persist preferences', {
+          error: result.error,
+        })
+        throw new Error(result.error)
+      }
+    },
+    onSuccess: (_, preferences) => {
+      queryClient.setQueryData(preferencesQueryKeys.preferences(), preferences)
+      logger.info('Preferences cache updated (quiet)')
+    },
   })
 }
 

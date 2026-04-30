@@ -58,6 +58,19 @@ pub fn click_mstsc_connect() -> Result<(), String> {
     }
 }
 
+/// End-to-end mstsc connect: launch, wait for dialog, inject IP, click Connect.
+pub async fn run_mstsc_full_flow(ip: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        platform::run_full_flow_impl(ip).await
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = ip;
+        Err("mstsc automation is only supported on Windows".into())
+    }
+}
+
 #[cfg(target_os = "windows")]
 mod platform {
     use super::{LaunchResult, MSTSC_PROCESS_NAME};
@@ -239,6 +252,51 @@ mod platform {
             SendMessageW(target, BM_CLICK, WPARAM(0), LPARAM(0));
         }
         Ok(())
+    }
+
+    pub(super) async fn run_full_flow_impl(ip: &str) -> Result<(), String> {
+        log::info!("[mstsc] run_full_flow start");
+        launch_mstsc_impl()?;
+
+        const MAX_ATTEMPTS: u32 = 30;
+        const DELAY_MS: u64 = 300;
+        let mut last_err = String::new();
+        for attempt in 1..=MAX_ATTEMPTS {
+            match inject_mstsc_ip_impl(ip) {
+                Ok(()) => {
+                    log::info!("[mstsc] inject ok on attempt {attempt}");
+                    last_err.clear();
+                    break;
+                }
+                Err(e) => {
+                    last_err = e.clone();
+                    if !is_transient_mstsc_error(&e) {
+                        return Err(e);
+                    }
+                    if attempt == MAX_ATTEMPTS {
+                        return Err(format!(
+                            "Window/UI did not become ready after {}s: {e}",
+                            (MAX_ATTEMPTS as u64 * DELAY_MS) / 1000
+                        ));
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(DELAY_MS)).await;
+                }
+            }
+        }
+        if !last_err.is_empty() {
+            return Err(last_err);
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        click_mstsc_connect_impl()?;
+        log::info!("[mstsc] run_full_flow done");
+        Ok(())
+    }
+
+    fn is_transient_mstsc_error(err: &str) -> bool {
+        err.contains("mstsc window not found")
+            || err.contains("No visible ComboBox")
+            || err.contains("No inner Edit")
     }
 
     // ---- shared primitives (parallel to sangfor module) ------------------

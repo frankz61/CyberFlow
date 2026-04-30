@@ -33,6 +33,12 @@ pub struct AppPreferences {
     /// User's preferred language (e.g., "en", "es", "de")
     /// If None, uses system locale detection
     pub language: Option<String>,
+    /// Last used Sangfor VDI username (optional; persisted in preferences.json)
+    pub sangfor_default_username: Option<String>,
+    /// Last used Sangfor VDI password (optional; persisted locally — protect the file)
+    pub sangfor_default_password: Option<String>,
+    /// Last used MSTSC "计算机" field (IP or hostname)
+    pub mstsc_default_computer: Option<String>,
 }
 
 impl Default for AppPreferences {
@@ -41,6 +47,9 @@ impl Default for AppPreferences {
             theme: "system".to_string(),
             quick_pane_shortcut: None, // None means use default
             language: None,            // None means use system locale
+            sangfor_default_username: None,
+            sangfor_default_password: None,
+            mstsc_default_computer: None,
         }
     }
 }

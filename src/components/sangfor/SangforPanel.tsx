@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -12,6 +12,10 @@ import { Label } from '@/components/ui/label'
 import { commands } from '@/lib/tauri-bindings'
 import { logger } from '@/lib/logger'
 import { sleep, withRetry } from '@/lib/retry'
+import {
+  usePersistPreferencesQuiet,
+  usePreferences,
+} from '@/services/preferences'
 
 // Retry budget for the window-waiting steps. Sangfor's client can be
 // slow to cold-start (module loading, cert checks): budget ~60s at 500ms
@@ -23,11 +27,39 @@ const WINDOW_WAIT_DELAY_MS = 500
 type BusyAction = 'launch' | 'inject' | 'click' | 'run-all' | null
 
 export function SangforPanel() {
+  const { data: preferences } = usePreferences()
+  const persistQuiet = usePersistPreferencesQuiet()
+  const didHydrate = useRef(false)
+
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState<BusyAction>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info')
+
+  useEffect(() => {
+    if (!preferences || didHydrate.current) {
+      return
+    }
+    setUsername(preferences.sangfor_default_username ?? '')
+    setPassword(preferences.sangfor_default_password ?? '')
+    didHydrate.current = true
+  }, [preferences])
+
+  /** Persist username/password into `preferences.json`. When `onlyAfterHydrate`, skips until initial load applied (avoids wiping saved creds before hydrate). */
+  const syncCredentialsToPreferences = (onlyAfterHydrate = true) => {
+    if (!preferences) {
+      return
+    }
+    if (onlyAfterHydrate && !didHydrate.current) {
+      return
+    }
+    void persistQuiet.mutate({
+      ...preferences,
+      sangfor_default_username: username.trim() || null,
+      sangfor_default_password: password || null,
+    })
+  }
 
   const reportOk = (msg: string) => {
     setStatus(msg)
@@ -61,6 +93,7 @@ export function SangforPanel() {
     const result = await commands.injectSangforCredentials(u, password)
     if (result.status === 'ok') {
       reportOk('账号已填入登录框')
+      syncCredentialsToPreferences(false)
     } else {
       reportErr(result.error)
       logger.warn('Sangfor inject failed', { error: result.error })
@@ -148,6 +181,7 @@ export function SangforPanel() {
     }
 
     reportOk('一键登录完成')
+    syncCredentialsToPreferences(false)
     setBusy(null)
   }
 
@@ -167,6 +201,7 @@ export function SangforPanel() {
               id="sangfor-username"
               value={username}
               onChange={e => setUsername(e.target.value)}
+              onBlur={() => syncCredentialsToPreferences()}
               placeholder="请输入用户名"
               autoComplete="off"
               disabled={busy !== null}
@@ -179,6 +214,7 @@ export function SangforPanel() {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
+              onBlur={() => syncCredentialsToPreferences()}
               autoComplete="off"
               disabled={busy !== null}
             />

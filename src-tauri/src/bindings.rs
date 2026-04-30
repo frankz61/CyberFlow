@@ -1,7 +1,9 @@
 use tauri_specta::{collect_commands, Builder};
 
 pub fn generate_bindings() -> Builder<tauri::Wry> {
-    use crate::commands::{mstsc, notifications, preferences, quick_pane, recovery, sangfor};
+    use crate::commands::{
+        mcp, mstsc, notifications, preferences, quick_pane, recovery, sangfor,
+    };
 
     Builder::<tauri::Wry>::new().commands(collect_commands![
         preferences::greet,
@@ -22,6 +24,10 @@ pub fn generate_bindings() -> Builder<tauri::Wry> {
         mstsc::launch_mstsc,
         mstsc::inject_mstsc_ip,
         mstsc::click_mstsc_connect,
+        mcp::start_mcp_server,
+        mcp::stop_mcp_server,
+        mcp::get_mcp_server_status,
+        mcp::regenerate_mcp_token,
     ])
 }
 

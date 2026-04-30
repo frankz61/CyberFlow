@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 import { SangforPanel } from '@/components/sangfor/SangforPanel'
 import { MstscPanel } from '@/components/mstsc/MstscPanel'
+import { McpServerPanel } from '@/components/mcp/McpServerPanel'
 
 interface MainWindowContentProps {
   children?: React.ReactNode
@@ -24,6 +25,7 @@ export function MainWindowContent({
                 按栏目分组的桌面自动化快捷入口
               </p>
             </header>
+            <McpServerPanel />
             <SangforPanel />
             <MstscPanel />
           </div>

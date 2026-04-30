@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -12,6 +12,10 @@ import { Label } from '@/components/ui/label'
 import { commands } from '@/lib/tauri-bindings'
 import { logger } from '@/lib/logger'
 import { sleep, withRetry } from '@/lib/retry'
+import {
+  usePersistPreferencesQuiet,
+  usePreferences,
+} from '@/services/preferences'
 
 // mstsc opens its dialog quickly (<1s typically). 15 attempts at 300ms
 // gives us ~4.5s, which covers slow disks or UAC interruptions.
@@ -21,10 +25,35 @@ const WINDOW_WAIT_DELAY_MS = 300
 type BusyAction = 'launch' | 'inject' | 'click' | 'run-all' | null
 
 export function MstscPanel() {
+  const { data: preferences } = usePreferences()
+  const persistQuiet = usePersistPreferencesQuiet()
+  const didHydrate = useRef(false)
+
   const [ip, setIp] = useState('')
   const [busy, setBusy] = useState<BusyAction>(null)
   const [status, setStatus] = useState<string | null>(null)
   const [statusKind, setStatusKind] = useState<'info' | 'error'>('info')
+
+  useEffect(() => {
+    if (!preferences || didHydrate.current) {
+      return
+    }
+    setIp(preferences.mstsc_default_computer ?? '')
+    didHydrate.current = true
+  }, [preferences])
+
+  const syncComputerToPreferences = (onlyAfterHydrate = true) => {
+    if (!preferences) {
+      return
+    }
+    if (onlyAfterHydrate && !didHydrate.current) {
+      return
+    }
+    void persistQuiet.mutate({
+      ...preferences,
+      mstsc_default_computer: ip.trim() || null,
+    })
+  }
 
   const reportOk = (msg: string) => {
     setStatus(msg)
@@ -58,6 +87,7 @@ export function MstscPanel() {
     const result = await commands.injectMstscIp(trimmed)
     if (result.status === 'ok') {
       reportOk(`IP 已注入: ${trimmed}`)
+      syncComputerToPreferences(false)
     } else {
       reportErr(result.error)
       logger.warn('mstsc inject failed', { error: result.error })
@@ -130,6 +160,7 @@ export function MstscPanel() {
     }
 
     reportOk('一键连接完成')
+    syncComputerToPreferences(false)
     setBusy(null)
   }
 
@@ -149,6 +180,7 @@ export function MstscPanel() {
               id="mstsc-ip"
               value={ip}
               onChange={e => setIp(e.target.value)}
+              onBlur={() => syncComputerToPreferences()}
               placeholder="例如 192.168.1.100"
               disabled={busy !== null}
             />

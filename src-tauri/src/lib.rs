@@ -6,6 +6,7 @@
 
 mod bindings;
 mod commands;
+mod mcp;
 mod types;
 mod utils;
 
@@ -107,6 +108,11 @@ pub fn run() {
                 "App handle initialized for package: {}",
                 app.package_info().name
             );
+
+            // Register MCP server state (tokens + running-server handle).
+            // Managed under Arc so axum's tokio spawn can hold a clone.
+            let mcp_state = std::sync::Arc::new(mcp::McpServerState::new(app.handle()));
+            app.manage(mcp_state);
 
             // Set up global shortcut plugin (without any shortcuts - we register them separately)
             #[cfg(desktop)]

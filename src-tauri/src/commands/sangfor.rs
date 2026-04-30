@@ -60,6 +60,22 @@ pub fn click_sangfor_login() -> Result<(), String> {
     }
 }
 
+/// End-to-end Sangfor login: launch, wait for dialog, inject credentials,
+/// click "登录". Used by the MCP server; also safe to call from Tauri
+/// command handlers. Uses tokio::time::sleep so it cooperates with the
+/// async runtime instead of blocking a worker thread.
+pub async fn run_sangfor_full_flow(username: &str, password: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        platform::run_full_flow_impl(username, password).await
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (username, password);
+        Err("Sangfor client automation is only supported on Windows".into())
+    }
+}
+
 #[cfg(target_os = "windows")]
 mod platform {
     use super::{LaunchResult, SANGFOR_EXE_PATH, SANGFOR_PROCESS_NAME};
@@ -249,6 +265,62 @@ mod platform {
             SendMessageW(target, BM_CLICK, WPARAM(0), LPARAM(0));
         }
         Ok(())
+    }
+
+    /// Orchestrated flow: launch → retry-wait for dialog → inject → click.
+    /// Mirrors the retry whitelist used by the frontend's run-all button.
+    pub(super) async fn run_full_flow_impl(
+        username: &str,
+        password: &str,
+    ) -> Result<(), String> {
+        log::info!("[sangfor] run_full_flow start");
+        launch_sangfor_client_impl()?;
+
+        const MAX_ATTEMPTS: u32 = 120;
+        const DELAY_MS: u64 = 500;
+        let mut last_err = String::new();
+        for attempt in 1..=MAX_ATTEMPTS {
+            match inject_sangfor_credentials_impl(username, password) {
+                Ok(()) => {
+                    log::info!("[sangfor] inject ok on attempt {attempt}");
+                    last_err.clear();
+                    break;
+                }
+                Err(e) => {
+                    last_err = e.clone();
+                    if !is_transient_sangfor_error(&e) {
+                        log::warn!(
+                            "[sangfor] non-transient error on attempt {attempt}: {e}"
+                        );
+                        return Err(e);
+                    }
+                    if attempt == MAX_ATTEMPTS {
+                        log::warn!(
+                            "[sangfor] retry budget exhausted ({MAX_ATTEMPTS} × {DELAY_MS}ms)"
+                        );
+                        return Err(format!(
+                            "Window/UI did not become ready after {}s: {e}",
+                            (MAX_ATTEMPTS as u64 * DELAY_MS) / 1000
+                        ));
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(DELAY_MS)).await;
+                }
+            }
+        }
+        if !last_err.is_empty() {
+            return Err(last_err);
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        click_sangfor_login_impl()?;
+        log::info!("[sangfor] run_full_flow done");
+        Ok(())
+    }
+
+    fn is_transient_sangfor_error(err: &str) -> bool {
+        err.contains("login window not found")
+            || err.contains("Expected at least")
+            || err.contains("Could not locate a visible")
     }
 
     fn collect_button_children(parent: HWND) -> Vec<HWND> {

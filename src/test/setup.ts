@@ -31,9 +31,17 @@ vi.mock('@tauri-apps/plugin-updater', () => ({
 vi.mock('@/lib/tauri-bindings', () => ({
   commands: {
     greet: vi.fn().mockResolvedValue('Hello, test!'),
-    loadPreferences: vi
-      .fn()
-      .mockResolvedValue({ status: 'ok', data: { theme: 'system' } }),
+    loadPreferences: vi.fn().mockResolvedValue({
+      status: 'ok',
+      data: {
+        theme: 'system',
+        quick_pane_shortcut: null,
+        language: null,
+        sangfor_default_username: null,
+        sangfor_default_password: null,
+        mstsc_default_computer: null,
+      },
+    }),
     savePreferences: vi.fn().mockResolvedValue({ status: 'ok', data: null }),
     sendNativeNotification: vi
       .fn()

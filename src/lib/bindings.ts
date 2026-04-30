@@ -190,6 +190,38 @@ async clickMstscConnect() : Promise<Result<null, string>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async startMcpServer() : Promise<Result<ServerInfo, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("start_mcp_server") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async stopMcpServer() : Promise<Result<ServerInfo, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("stop_mcp_server") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getMcpServerStatus() : Promise<Result<ServerInfo, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_mcp_server_status") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async regenerateMcpToken() : Promise<Result<ServerInfo, string>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("regenerate_mcp_token") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -217,9 +249,22 @@ quick_pane_shortcut: string | null;
  * User's preferred language (e.g., "en", "es", "de")
  * If None, uses system locale detection
  */
-language: string | null }
+language: string | null; 
+/**
+ * Last used Sangfor VDI username (optional; persisted in preferences.json)
+ */
+sangfor_default_username: string | null; 
+/**
+ * Last used Sangfor VDI password (optional; persisted locally — protect the file)
+ */
+sangfor_default_password: string | null; 
+/**
+ * Last used MSTSC "计算机" field (IP or hostname)
+ */
+mstsc_default_computer: string | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LaunchResult = { launched: boolean; message: string }
+export type ServerInfo = { running: boolean; port: number | null; url: string | null; token: string }
 /**
  * Error types for recovery operations (typed for frontend matching)
  */

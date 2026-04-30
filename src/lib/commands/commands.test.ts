@@ -4,7 +4,7 @@ import type { CommandContext, AppCommand } from './types'
 
 const mockUIStore = {
   getState: vi.fn(() => ({
-    leftSidebarVisible: true,
+    leftSidebarVisible: false,
     commandPaletteOpen: false,
     setLeftSidebarVisible: vi.fn(),
   })),

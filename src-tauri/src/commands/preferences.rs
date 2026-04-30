@@ -86,6 +86,16 @@ pub async fn save_preferences(app: AppHandle, preferences: AppPreferences) -> Re
     // Validate theme value
     validate_theme(&preferences.theme)?;
 
+    if let Some(ref u) = preferences.sangfor_default_username {
+        validate_string_input(u, 256, "Sangfor username")?;
+    }
+    if let Some(ref p) = preferences.sangfor_default_password {
+        validate_string_input(p, 512, "Sangfor password")?;
+    }
+    if let Some(ref c) = preferences.mstsc_default_computer {
+        validate_string_input(c, 256, "MSTSC computer")?;
+    }
+
     log::debug!("Saving preferences to disk: {preferences:?}");
     let prefs_path = get_preferences_path(&app)?;
 

@@ -35,6 +35,11 @@ tauri-plugin-global-shortcut = "2"
 log = "0.4"
 regex = "1"
 
+# MCP server: local HTTP + JSON-RPC + token auth
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "net", "sync", "macros", "time"] }
+rand = "0.8"
+
 # Type-safe Tauri command bindings
 specta = { version = "=2.0.0-rc.22", features = ["derive", "serde_json"] }
 tauri-specta = { version = "=2.0.0-rc.21", features = ["typescript"] }
