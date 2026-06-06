@@ -42,6 +42,7 @@ export function SangforPanel() {
     if (!preferences || didHydrate.current) {
       return
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing with external async preferences on initial load
     setUsername(preferences.sangfor_default_username ?? '')
     setPassword(preferences.sangfor_default_password ?? '')
     didHydrate.current = true

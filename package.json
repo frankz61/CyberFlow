@@ -2,7 +2,7 @@
   "name": "cyberflow",
   "description": "A completely open, scriptable AI assistant for your desktop. CyberFlow turns daily routines into automated, intelligent workflows through powerful LLM integrations and deep OS hooks.",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "author": "zhanghuawei",
   "copyright": "Copyright © 2026 zhanghuawei. All rights reserved.",

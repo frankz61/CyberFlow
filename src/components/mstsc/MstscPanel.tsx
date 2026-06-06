@@ -38,6 +38,7 @@ export function MstscPanel() {
     if (!preferences || didHydrate.current) {
       return
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing with external async preferences on initial load
     setIp(preferences.mstsc_default_computer ?? '')
     didHydrate.current = true
   }, [preferences])
@@ -169,7 +170,7 @@ export function MstscPanel() {
       <CardHeader>
         <CardTitle>Windows 远程桌面 (MSTSC)</CardTitle>
         <CardDescription>
-          启动 mstsc，将 IP / 主机名注入"计算机"字段，然后点击连接
+          启动 mstsc，将 IP / 主机名注入“计算机”字段，然后点击连接
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
