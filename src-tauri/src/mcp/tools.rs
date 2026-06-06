@@ -78,7 +78,9 @@ pub async fn call_tool(name: &str, args: &Value) -> Result<Value, String> {
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| "missing 'ip' argument".to_string())?;
             mstsc::run_mstsc_full_flow(ip).await?;
-            Ok(text_result(&format!("mstsc connect flow completed (ip={ip})")))
+            Ok(text_result(&format!(
+                "mstsc connect flow completed (ip={ip})"
+            )))
         }
         other => Err(format!("unknown tool: {other}")),
     }

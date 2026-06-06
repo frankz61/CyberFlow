@@ -143,7 +143,7 @@ async updateQuickPaneShortcut(shortcut: string | null) : Promise<Result<null, st
     else return { status: "error", error: e  as any };
 }
 },
-async launchSangforClient() : Promise<Result<LaunchResult, string>> {
+async launchSangforClient() : Promise<Result<SangforLaunchResult, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("launch_sangfor_client") };
 } catch (e) {
@@ -264,7 +264,6 @@ sangfor_default_password: string | null;
 mstsc_default_computer: string | null }
 export type JsonValue = null | boolean | number | string | JsonValue[] | Partial<{ [key in string]: JsonValue }>
 export type LaunchResult = { launched: boolean; message: string }
-export type ServerInfo = { running: boolean; port: number | null; url: string | null; token: string }
 /**
  * Error types for recovery operations (typed for frontend matching)
  */
@@ -289,6 +288,21 @@ export type RecoveryError =
  * JSON serialization/deserialization error
  */
 { type: "ParseError"; message: string }
+export type SangforLaunchResult = { 
+/**
+ * True if we spawned a new process; false if an existing one was focused.
+ */
+launched: boolean; 
+/**
+ * True if a post-login main window (larger than the login dialog) is
+ * already showing — the caller can skip inject/login entirely.
+ */
+alreadyActive: boolean; 
+/**
+ * Human-readable status (locale-neutral English; UI layer translates).
+ */
+message: string }
+export type ServerInfo = { running: boolean; port: number | null; url: string | null; token: string }
 
 /** tauri-specta globals **/
 

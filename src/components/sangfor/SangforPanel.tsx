@@ -17,12 +17,13 @@ import {
   usePreferences,
 } from '@/services/preferences'
 
-// Retry budget for the window-waiting steps. Sangfor's client can be
-// slow to cold-start (module loading, cert checks): budget ~60s at 500ms
-// polls. When the client is already open, inject succeeds on attempt 1
-// so the wall-clock cost is near zero.
-const WINDOW_WAIT_ATTEMPTS = 120
-const WINDOW_WAIT_DELAY_MS = 500
+// Retry budget for the window-waiting steps. Sangfor's client can be slow
+// to cold-start (module loading, cert checks). We probe at a low frequency —
+// once every 3s — to avoid hammering the still-initializing client; 30
+// attempts × 3s ≈ 90s budget. When the client is already open, inject
+// succeeds on attempt 1 so the wall-clock cost is near zero.
+const WINDOW_WAIT_ATTEMPTS = 30
+const WINDOW_WAIT_DELAY_MS = 3000
 
 type BusyAction = 'launch' | 'inject' | 'click' | 'run-all' | null
 
@@ -131,6 +132,15 @@ export function SangforPanel() {
       return
     }
     logger.info('run-all launch ok', launchResult.data)
+
+    // Already past login? If a main window larger than the login dialog is
+    // showing, there's nothing to fill — stop here instead of probing.
+    if (launchResult.data.alreadyActive) {
+      reportOk('客户端已登录，无需处理')
+      logger.info('run-all: client already active, skipping inject/click')
+      setBusy(null)
+      return
+    }
 
     // Step 2: inject — retry until the login dialog is discoverable.
     // A cold-start needs a few seconds before the dialog exists; we poll

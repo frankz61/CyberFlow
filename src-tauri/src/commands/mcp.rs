@@ -36,9 +36,7 @@ pub async fn start_mcp_server(
 
 #[tauri::command]
 #[specta::specta]
-pub async fn stop_mcp_server(
-    state: State<'_, Arc<McpServerState>>,
-) -> Result<ServerInfo, String> {
+pub async fn stop_mcp_server(state: State<'_, Arc<McpServerState>>) -> Result<ServerInfo, String> {
     if let Some(mut running) = state.take_running() {
         if let Some(tx) = running.shutdown_tx.take() {
             let _ = tx.send(());

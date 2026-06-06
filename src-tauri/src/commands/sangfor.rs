@@ -9,9 +9,12 @@ use specta::Type;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct LaunchResult {
+pub struct SangforLaunchResult {
     /// True if we spawned a new process; false if an existing one was focused.
     pub launched: bool,
+    /// True if a post-login main window (larger than the login dialog) is
+    /// already showing — the caller can skip inject/login entirely.
+    pub already_active: bool,
     /// Human-readable status (locale-neutral English; UI layer translates).
     pub message: String,
 }
@@ -22,7 +25,7 @@ const SANGFOR_PROCESS_NAME: &str = "SangforCSClient.exe";
 
 #[tauri::command]
 #[specta::specta]
-pub fn launch_sangfor_client() -> Result<LaunchResult, String> {
+pub fn launch_sangfor_client() -> Result<SangforLaunchResult, String> {
     #[cfg(target_os = "windows")]
     {
         platform::launch_sangfor_client_impl()
@@ -78,11 +81,11 @@ pub async fn run_sangfor_full_flow(username: &str, password: &str) -> Result<(),
 
 #[cfg(target_os = "windows")]
 mod platform {
-    use super::{LaunchResult, SANGFOR_EXE_PATH, SANGFOR_PROCESS_NAME};
+    use super::{SangforLaunchResult, SANGFOR_EXE_PATH, SANGFOR_PROCESS_NAME};
     use std::cell::RefCell;
     use std::path::Path;
     use windows::core::PCWSTR;
-    use windows::Win32::Foundation::{BOOL, CloseHandle, HWND, LPARAM, RECT, WPARAM};
+    use windows::Win32::Foundation::{CloseHandle, BOOL, HWND, LPARAM, RECT, WPARAM};
     use windows::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
         TH32CS_SNAPPROCESS,
@@ -95,8 +98,8 @@ mod platform {
     use windows::Win32::UI::WindowsAndMessaging::{
         EnumChildWindows, EnumWindows, GetClassNameW, GetWindowLongW, GetWindowRect,
         GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
-        SendMessageW, SetForegroundWindow, ShowWindow, GWL_STYLE, HWND_TOP, SW_RESTORE,
-        WM_GETTEXT, WM_GETTEXTLENGTH,
+        SendMessageW, SetForegroundWindow, ShowWindow, GWL_STYLE, HWND_TOP, SW_RESTORE, WM_GETTEXT,
+        WM_GETTEXTLENGTH,
     };
 
     // Edit control style bits (diagnostics / filtering).
@@ -108,28 +111,35 @@ mod platform {
     // Button click notification (works cross-process; no focus required).
     const BM_CLICK: u32 = 0x00F5;
 
-    pub(super) fn launch_sangfor_client_impl() -> Result<LaunchResult, String> {
+    pub(super) fn launch_sangfor_client_impl() -> Result<SangforLaunchResult, String> {
         if let Some(pid) = find_process_by_name(SANGFOR_PROCESS_NAME) {
             // Already running: find its top-level window and bring it to front.
             if let Some(hwnd) = find_window_by_pid(pid) {
                 let _ = unsafe { ShowWindow(hwnd, SW_RESTORE) };
                 let _ = unsafe { SetForegroundWindow(hwnd) };
-                return Ok(LaunchResult {
+                // If a post-login main window is already up, there's nothing to
+                // fill — report it so the caller skips inject/click.
+                let already_active = has_main_window(pid);
+                return Ok(SangforLaunchResult {
                     launched: false,
-                    message: "Focused existing Sangfor client window".into(),
+                    already_active,
+                    message: if already_active {
+                        "Sangfor client already active (main window present)".into()
+                    } else {
+                        "Focused existing Sangfor client window".into()
+                    },
                 });
             }
             // Process exists but no visible window yet — treat as already launched.
-            return Ok(LaunchResult {
+            return Ok(SangforLaunchResult {
                 launched: false,
+                already_active: false,
                 message: "Sangfor client already running (no window yet)".into(),
             });
         }
 
         if !Path::new(SANGFOR_EXE_PATH).exists() {
-            return Err(format!(
-                "Sangfor client not found at {SANGFOR_EXE_PATH}"
-            ));
+            return Err(format!("Sangfor client not found at {SANGFOR_EXE_PATH}"));
         }
 
         // Detach: don't wait for child, don't inherit stdio.
@@ -137,8 +147,9 @@ mod platform {
             .spawn()
             .map_err(|e| format!("Failed to launch Sangfor client: {e}"))?;
 
-        Ok(LaunchResult {
+        Ok(SangforLaunchResult {
             launched: true,
+            already_active: false,
             message: "Launched Sangfor client".into(),
         })
     }
@@ -260,7 +271,10 @@ mod platform {
                 "Could not locate a visible \"登录\" button on the current tab".to_string()
             })?;
 
-        log::info!("[sangfor] clicking login button hwnd={:#x}", target.0 as usize);
+        log::info!(
+            "[sangfor] clicking login button hwnd={:#x}",
+            target.0 as usize
+        );
         unsafe {
             SendMessageW(target, BM_CLICK, WPARAM(0), LPARAM(0));
         }
@@ -269,15 +283,19 @@ mod platform {
 
     /// Orchestrated flow: launch → retry-wait for dialog → inject → click.
     /// Mirrors the retry whitelist used by the frontend's run-all button.
-    pub(super) async fn run_full_flow_impl(
-        username: &str,
-        password: &str,
-    ) -> Result<(), String> {
+    pub(super) async fn run_full_flow_impl(username: &str, password: &str) -> Result<(), String> {
         log::info!("[sangfor] run_full_flow start");
-        launch_sangfor_client_impl()?;
+        let launch = launch_sangfor_client_impl()?;
+        if launch.already_active {
+            log::info!("[sangfor] run_full_flow: client already active, skipping inject/click");
+            return Ok(());
+        }
 
-        const MAX_ATTEMPTS: u32 = 120;
-        const DELAY_MS: u64 = 500;
+        // Probe the login window at a low frequency (every 3s) so we don't
+        // hammer the still-initializing client during cold-start. 30 attempts
+        // × 3s ≈ 90s budget — ample for module loading and cert checks.
+        const MAX_ATTEMPTS: u32 = 30;
+        const DELAY_MS: u64 = 3000;
         let mut last_err = String::new();
         for attempt in 1..=MAX_ATTEMPTS {
             match inject_sangfor_credentials_impl(username, password) {
@@ -289,9 +307,7 @@ mod platform {
                 Err(e) => {
                     last_err = e.clone();
                     if !is_transient_sangfor_error(&e) {
-                        log::warn!(
-                            "[sangfor] non-transient error on attempt {attempt}: {e}"
-                        );
+                        log::warn!("[sangfor] non-transient error on attempt {attempt}: {e}");
                         return Err(e);
                     }
                     if attempt == MAX_ATTEMPTS {
@@ -426,6 +442,65 @@ mod platform {
         BOOL(1) // continue
     }
 
+    // A visible, non-dialog Sangfor window at least this large is treated as
+    // the post-login main/VDI window rather than the (small) login dialog.
+    // Tunable; every checked window is logged so the threshold can be adjusted
+    // against real builds.
+    const MAIN_WINDOW_MIN_WIDTH: i32 = 900;
+    const MAIN_WINDOW_MIN_HEIGHT: i32 = 700;
+
+    /// True if `pid` owns a visible top-level window larger than the login
+    /// dialog (and not the login dialog class `#32770`) — i.e. the client is
+    /// already past login and showing its main window, so there's nothing to
+    /// fill.
+    fn has_main_window(pid: u32) -> bool {
+        let windows = collect_pid_windows(pid);
+        log::info!(
+            "[sangfor] main-window check: {} visible top-level windows for pid {pid}",
+            windows.len()
+        );
+        for &hwnd in &windows {
+            let class = get_class_name(hwnd);
+            let (w, h) = get_window_rect(hwnd)
+                .map(|r| (r.right - r.left, r.bottom - r.top))
+                .unwrap_or((0, 0));
+            // The login dialog is a small `#32770`; never count it as "main".
+            let is_login_dialog = class == "#32770";
+            let big = w >= MAIN_WINDOW_MIN_WIDTH && h >= MAIN_WINDOW_MIN_HEIGHT;
+            log::info!(
+                "[sangfor]   window hwnd={:#x} class={class:?} size={w}x{h} login_dialog={is_login_dialog} big={big}",
+                hwnd.0 as usize
+            );
+            if big && !is_login_dialog {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Collect all visible top-level windows owned by `pid`.
+    fn collect_pid_windows(pid: u32) -> Vec<HWND> {
+        ENUM_STATE.with(|s| {
+            let mut s = s.borrow_mut();
+            s.target_pid = pid;
+            s.collected.clear();
+        });
+        unsafe {
+            let _ = EnumWindows(Some(enum_collect_pid_windows_proc), LPARAM(0));
+        }
+        ENUM_STATE.with(|s| s.borrow().collected.clone())
+    }
+
+    unsafe extern "system" fn enum_collect_pid_windows_proc(hwnd: HWND, _lparam: LPARAM) -> BOOL {
+        let target = ENUM_STATE.with(|s| s.borrow().target_pid);
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == target && IsWindowVisible(hwnd).as_bool() {
+            ENUM_STATE.with(|s| s.borrow_mut().collected.push(hwnd));
+        }
+        BOOL(1)
+    }
+
     /// Find the top-level login dialog. Logs every visible `#32770` dialog
     /// seen during enumeration so we can diagnose mismatches against the
     /// actual Sangfor client build in use.
@@ -462,9 +537,7 @@ mod platform {
         // If nothing matched by title, fall back to the first visible #32770
         // — better to try something than fail silently.
         if best.is_none() && !candidates.is_empty() {
-            log::warn!(
-                "[sangfor] no title match; falling back to first #32770 candidate"
-            );
+            log::warn!("[sangfor] no title match; falling back to first #32770 candidate");
             best = candidates.first().copied();
         }
         best
@@ -500,20 +573,68 @@ mod platform {
 
     // ---- text I/O on Edit controls --------------------------------------
 
-    /// Focus the target Edit (cross-process via AttachThreadInput), clear
-    /// any existing content, then SendInput each UTF-16 code unit as a
-    /// KEYEVENTF_UNICODE synthetic keypress. This drives the control the
-    /// same way a real keyboard would — required for secure password
-    /// Edits that reject WM_SETTEXT / WM_CHAR from other processes.
+    /// Fill `edit` with `text`, then verify the control's reported length and
+    /// re-fill on mismatch. This is the "填充完确认长度是否一致，不一致再次填充"
+    /// requirement: after each fill pass we read the Edit's text length back
+    /// and, if it doesn't match what we sent, clear and type again.
+    ///
+    /// Non-password Edits (username) report their length faithfully across
+    /// processes, so they're fully verified and re-typed until they match (or
+    /// the attempt budget is exhausted, which surfaces an error). Password
+    /// Edits block cross-process read-back (length reads 0); when that happens
+    /// we can't verify and must trust the send after a single pass.
     fn type_into_edit(top: HWND, edit: HWND, text: &str, label: &str) -> Result<(), String> {
+        let expected = text.encode_utf16().count();
+        let is_password = (unsafe { GetWindowLongW(edit, GWL_STYLE) } & ES_PASSWORD) != 0;
+
+        // A handful of re-fills covers transient races (focus not yet settled,
+        // keystrokes leaking) without looping forever on a genuinely stuck UI.
+        const MAX_FILL_ATTEMPTS: u32 = 3;
+        for attempt in 1..=MAX_FILL_ATTEMPTS {
+            fill_edit_once(top, edit, text, label)?;
+
+            let actual = read_edit_text_length(edit);
+            // Password Edit returning 0 == read-back blocked; can't verify.
+            if is_password && actual == 0 {
+                log::info!(
+                    "[sangfor] verify[{label}] attempt {attempt}/{MAX_FILL_ATTEMPTS}: \
+                     read-back blocked (password), trusting send (expected={expected})"
+                );
+                return Ok(());
+            }
+            if actual == expected {
+                log::info!(
+                    "[sangfor] verify[{label}] attempt {attempt}/{MAX_FILL_ATTEMPTS}: \
+                     ok (len={actual})"
+                );
+                return Ok(());
+            }
+            log::warn!(
+                "[sangfor] verify[{label}] attempt {attempt}/{MAX_FILL_ATTEMPTS}: \
+                 length mismatch actual={actual} expected={expected}; re-filling"
+            );
+        }
+
+        Err(format!(
+            "Fill verification failed for {label}: length never matched (expected {expected}) after {MAX_FILL_ATTEMPTS} attempts"
+        ))
+    }
+
+    /// One fill pass: focus the target Edit (cross-process via
+    /// AttachThreadInput), clear any existing content, then SendInput each
+    /// UTF-16 code unit as a KEYEVENTF_UNICODE synthetic keypress. This drives
+    /// the control the same way a real keyboard would — required for secure
+    /// password Edits that reject WM_SETTEXT / WM_CHAR from other processes.
+    fn fill_edit_once(top: HWND, edit: HWND, text: &str, label: &str) -> Result<(), String> {
         let focused = focus_edit_cross_process(top, edit);
         log::info!(
-            "[sangfor] type_into[{label}] hwnd={:#x} focused={focused}",
+            "[sangfor] fill[{label}] hwnd={:#x} focused={focused}",
             edit.0 as usize
         );
 
         // Clear existing content. EM_SETSEL(0,-1) + WM_CLEAR is focus-independent
-        // and works on Edit controls across processes.
+        // and works on Edit controls across processes. Crucially, this also
+        // resets the field before a re-fill so retries don't append.
         unsafe {
             SendMessageW(edit, EM_SETSEL, WPARAM(0), LPARAM(-1));
             SendMessageW(edit, WM_CLEAR, WPARAM(0), LPARAM(0));
@@ -521,7 +642,7 @@ mod platform {
 
         let units: Vec<u16> = text.encode_utf16().collect();
         if units.is_empty() {
-            log::warn!("[sangfor] type_into[{label}] text is empty, nothing to send");
+            log::warn!("[sangfor] fill[{label}] text is empty, nothing to send");
             return Ok(());
         }
 
@@ -534,7 +655,7 @@ mod platform {
         let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
         let expected = inputs.len() as u32;
         log::info!(
-            "[sangfor] type_into[{label}] SendInput sent={sent}/{expected} code_units={}",
+            "[sangfor] fill[{label}] SendInput sent={sent}/{expected} code_units={}",
             units.len()
         );
         if sent != expected {
@@ -552,12 +673,12 @@ mod platform {
         let drain_budget_ms: u64 = 100 + units.len() as u64 * 10;
         let drain_start = std::time::Instant::now();
         loop {
-            let current_len = read_edit_text(edit).encode_utf16().count();
+            let current_len = read_edit_text_length(edit);
             let done = current_len >= units.len();
             let elapsed = drain_start.elapsed().as_millis() as u64;
             if done || elapsed > drain_budget_ms {
                 log::info!(
-                    "[sangfor] type_into[{label}] drain: current_len={current_len} expected={} elapsed={elapsed}ms budget={drain_budget_ms}ms done={done}",
+                    "[sangfor] fill[{label}] drain: current_len={current_len} expected={} elapsed={elapsed}ms budget={drain_budget_ms}ms done={done}",
                     units.len()
                 );
                 break;
@@ -570,9 +691,7 @@ mod platform {
         let edit_is_password = (unsafe { GetWindowLongW(edit, GWL_STYLE) } & ES_PASSWORD) != 0;
         if edit_is_password {
             let settle_ms = 100 + units.len() as u64 * 8;
-            log::info!(
-                "[sangfor] type_into[{label}] password field: settling {settle_ms}ms"
-            );
+            log::info!("[sangfor] fill[{label}] password field: settling {settle_ms}ms");
             std::thread::sleep(std::time::Duration::from_millis(settle_ms));
         }
         Ok(())
@@ -622,6 +741,18 @@ mod platform {
                 "[sangfor] focus_edit: our_tid={our_tid} target_tid={target_tid} attached={attached} setfocus_ok={set_ok}"
             );
             set_ok
+        }
+    }
+
+    /// Length (in UTF-16 code units) the Edit reports for its current text.
+    /// Comparable directly against `text.encode_utf16().count()`. Returns 0
+    /// for password Edits that block cross-process read-back.
+    fn read_edit_text_length(hwnd: HWND) -> usize {
+        let len = unsafe { SendMessageW(hwnd, WM_GETTEXTLENGTH, WPARAM(0), LPARAM(0)).0 };
+        if len <= 0 {
+            0
+        } else {
+            len as usize
         }
     }
 

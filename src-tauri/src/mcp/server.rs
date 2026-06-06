@@ -126,17 +126,13 @@ async fn handle_jsonrpc(
 ) -> Response {
     // Auth first.
     if let Err(resp) = check_auth(&headers, &ctx.token) {
-        return resp;
+        return *resp;
     }
 
     let body = match body {
         Ok(Json(v)) => v,
         Err(_) => {
-            return error_response(
-                Value::Null,
-                PARSE_ERROR,
-                "invalid JSON body".into(),
-            );
+            return error_response(Value::Null, PARSE_ERROR, "invalid JSON body".into());
         }
     };
 
@@ -167,7 +163,9 @@ async fn handle_jsonrpc(
     }
 }
 
-fn check_auth(headers: &HeaderMap, expected: &str) -> Result<(), Response> {
+// The `Err` variant is a fully-rendered `Response`, which is large (>128B).
+// Box it so the `Result` stays small and clippy's `result_large_err` is happy.
+fn check_auth(headers: &HeaderMap, expected: &str) -> Result<(), Box<Response>> {
     let auth = headers
         .get("authorization")
         .and_then(|v| v.to_str().ok())
@@ -182,7 +180,9 @@ fn check_auth(headers: &HeaderMap, expected: &str) -> Result<(), Response> {
                 "message": "unauthorized: missing or invalid bearer token"
             }
         });
-        return Err((StatusCode::UNAUTHORIZED, Json(body)).into_response());
+        return Err(Box::new(
+            (StatusCode::UNAUTHORIZED, Json(body)).into_response(),
+        ));
     }
     Ok(())
 }

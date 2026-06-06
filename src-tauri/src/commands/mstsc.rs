@@ -76,7 +76,7 @@ mod platform {
     use super::{LaunchResult, MSTSC_PROCESS_NAME};
     use std::cell::RefCell;
     use std::path::PathBuf;
-    use windows::Win32::Foundation::{BOOL, CloseHandle, HWND, LPARAM, RECT, WPARAM};
+    use windows::Win32::Foundation::{CloseHandle, BOOL, HWND, LPARAM, RECT, WPARAM};
     use windows::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
         TH32CS_SNAPPROCESS,
@@ -120,10 +120,7 @@ mod platform {
             .map_err(|e| format!("Failed to launch mstsc: {e}"))?;
         // Best-effort: record resolved path so the log makes it obvious which binary ran.
         let resolved = PathBuf::from(r"C:\Windows\System32\mstsc.exe");
-        log::info!(
-            "[mstsc] spawned {}",
-            resolved.display()
-        );
+        log::info!("[mstsc] spawned {}", resolved.display());
         Ok(LaunchResult {
             launched: true,
             message: "Launched mstsc".into(),
@@ -523,5 +520,4 @@ mod platform {
             rect.map(|r| (r.left, r.top, r.right - r.left, r.bottom - r.top))
         );
     }
-
 }
